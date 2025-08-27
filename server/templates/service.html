@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block head %}
+<title>Passwordless Server</title>
+{% endblock %}
+{% block body %}
+<div class="container">
+	<div class="text-center mb-5">
+		<h3>{{serviceName}}</h3>
+	</div>
+	<a href="/"><button>All services</button></a>
+	<div class="card mb-3">
+		<div class="card-body">
+			<div class="d-flex flex-column flex-lg-row">
+				<div class="row flex-fill">
+					Service login/registration token<br>
+					<textarea id="key-field" rows="6" readonly>{{token}}</textarea>
+					<div class="mb-3">
+						<button class="btn btn-primary" onclick="copyKeyToClipboard()">Copy</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	{% if accounts %}
+	Registered users
+		{% for account in accounts %}
+		<div class="card mb-3">
+			<div class="card-body">
+				<div class="d-flex flex-column flex-lg-row">
+					<div class="row flex-fill">
+						<div class="col-sm-6">
+							<h4 class="h5">{{account}}</h4>
+						</div>
+						<div class="col-sm-6 text-lg-end">
+							<button class="btn btn-danger" onclick="deleteAccount(&quot;{{account}}&quot;, &quot;{{serviceName}}&quot;)">Delete</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		{% endfor %}
+	{% else %}
+	No accounts
+	{% endif %}
+</div>
+<script>listenForLogin("{{sessionId}}")</script>
+{% endblock %}

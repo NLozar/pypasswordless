@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block head %}
+<title>Passwordless Server</title>
+{% endblock %}
+{% block body %}
+<div class="container">
+	<div class="text-center mb-5">
+		<h3>Services</h3>
+		<input id="service-name">
+		<button onclick="createNewService()">Create new service</button>
+	</div>
+	<div id="services-list">
+		{% if services %}
+		{% for service in services %}
+		<div class="card mb-3">
+			<div class="card-body">
+				<div class="d-flex flex-column flex-lg-row">
+					<div class="row flex-fill">
+						<div class="col-sm-6">
+							<a href="/service?service-name={{service}}"><h4 class="h5">{{service}}</h4></a>
+						</div>
+						<div class="col-sm-6 text-lg-end">
+							<button class="btn btn-danger" onclick="deleteService(&quot;{{service}}&quot;)">Delete</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		{% endfor %}
+		{% else %}
+		No services
+		{% endif %}
+	</div>
+</div>
+{% endblock %}
