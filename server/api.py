@@ -156,7 +156,7 @@ def registerUser():
 		payload = helpers.verifyAndParseReqData(str(request.form.get("payload")), str(request.form.get("signature")))
 		if sessionId != payload["sessionId"]:
 			# making sure sessionId hasn't been swapped by MitM
-			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload["sessionId"]}\"", 401
+			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload['sessionId']}\"", 401
 		print(f"{payload=}")	# DEBUG
 		services = getListOfServices()[0]
 		if payload["serviceName"] not in services:
@@ -191,7 +191,7 @@ def authenticateUser():
 		payload = helpers.verifyAndParseReqData(str(request.form.get("payload")), str(request.form.get("signature")))
 		if sessionId != payload["sessionId"]:
 			# making sure sessionId hasn't been swapped by MitM
-			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload["sessionId"]}\"", 401
+			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload['sessionId']}\"", 401
 		print(f"{payload=}")	# DEBUG
 		services = getListOfServices()[0]
 		if payload["serviceName"] not in services:
@@ -248,7 +248,7 @@ def deleteAccount():
 		if not account or not service:
 			return "Missing account name or service name or both.", 400
 		db.deleteAccount(account, service)
-		return f"Deleted account \"{account}\" for service \"${service}\".", 204
+		return f"Deleted account \"{account}\" for service \"{service}\".", 204
 	except Exception as err:
 		print(f"Error deleting service: {err}")
 		traceback.print_exc()

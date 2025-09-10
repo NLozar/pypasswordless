@@ -198,7 +198,7 @@ def deleteAccount():
 		db.deleteAccount(account, service)
 		if not db.getAccountsUsernamesForService(service):
 			db.deleteService(service)
-		return f"Deleted account \"{account}\" for service \"${service}\".", 204
+		return f"Deleted account \"{account}\" for service \"{service}\".", 204
 	except Exception as err:
 		print(f"Error deleting service: {err}")
 		traceback.print_exc()
