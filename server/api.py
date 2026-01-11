@@ -101,7 +101,7 @@ def service():
 		accounts = db.getUsersOfService(serviceName)
 		return render_template("service.html", serviceName=serviceName, token=token, sessionId=sessionId, accounts=accounts)
 	except Exception as err:
-		logger.exception("Error getting service details. request.args = %s\nError: %s", request.args.to_dict(), err, extra={"req_ip", request.remote_addr})
+		logger.exception("Error getting service details. request.args = %s\nError: %s", request.args.to_dict(), err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 SHUTDOWN_MESSAGE = "__CLOSE__"
