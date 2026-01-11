@@ -8,7 +8,7 @@ import uuid
 from redis import Redis
 import helpers
 import atexit
-import traceback
+import logging
 
 app = Flask(__name__)
 HOST = "127.0.0.1"
@@ -18,27 +18,31 @@ db = DbHandler("data.sqlite3")
 db.createTables()
 r = Redis(host=HOST, port=REDIS_PORT, decode_responses=True)
 INTERNAL_SERVER_ERROR = "Internal server error"
+logger = logging.getLogger(__name__)
+log_handler = logging.StreamHandler()
+log_formatter = logging.Formatter("%(req_ip)s - - %(asctime)s.%(msecs)s - %(levelname)s - [func: %(funcName)s]: %(message)s", datefmt="%H:%M:%S", defaults={"req_ip": "N/A"})
+log_handler.setFormatter(log_formatter)
+logger.addHandler(log_handler)
+logger.setLevel(logging.DEBUG)
 
 @app.route("/", methods=["GET"])
 def index():
 	try:
 		services = getListOfServices()[0]
-		print("Services to render:", services)	# DEBUG
+		logger.debug("Services to render: %s", services, extra={"req_ip": request.remote_addr})
 		return render_template("index.html", services=services)
 	except Exception as err:
-		print("Error fetching list of services", err)
-		traceback.print_exc()
+		logger.exception("Error fetching list of services: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/getServiceNames", methods=["GET"])
 def getListOfServices():
 	try:
 		listOfServices = db.getServiceNames()
-		print("List of services:", listOfServices)	# DEBUG
+		logger.debug("List of services: %s", listOfServices, extra={"req_ip": request.remote_addr})
 		return listOfServices, 200
 	except Exception as err:
-		print("Error when listing services' names:", err)
-		traceback.print_exc()
+		logger.exception("Error when listing services' names: %s ", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/createService", methods=["POST"])
@@ -46,11 +50,10 @@ def createService():
 	try:
 		serviceName = request.form["service name"]
 	except KeyError:
-		print("Malformed request\nrequest.form:", request.form)
+		logger.warning("Malformed request. request.form: %s", request.form)
 		return "Malformed request", 400
 	except Exception as err:
-		print("Error when processing request to createService:", err)
-		traceback.print_exc()
+		logger.exception("Error when processing request to createService: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 	try:
 		listOfServices, status = getListOfServices()
@@ -59,25 +62,23 @@ def createService():
 		if (serviceName in listOfServices):
 			return f"Service name \"{serviceName}\" already taken", 409
 	except Exception as err:
-		print("Error creating service 1:", err)
-		traceback.print_exc()
+		logger.exception("Error creating service 1: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 	try:
 		secret_key = Ed25519PrivateKey.generate()
 		db.insertService(serviceName, secret_key.private_bytes_raw(), secret_key.public_key().public_bytes_raw())
 		return "Service created", 200
 	except Exception as err:
-		print("Error creating service 2:", err)
-		traceback.print_exc()
+		logger.exception("Error creating service 2: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/service", methods=["GET"])
 def service():
 	try:
 		serviceName = request.args.get("service-name")
-		print("Details for service:", serviceName)	# DEBUG
+		logger.debug("Details for service: %s", serviceName, extra={"req_ip": request.remote_addr})
 		if not serviceName:
-			print("Bad request for service details. request params:", request.args.to_dict())
+			logger.warning("Bad request for service details. request params: %s", request.args.to_dict(), extra={"req_ip": request.remote_addr})
 			return "Missing service-name parameter", 400
 		secret_key_bytes = db.getServiceSecretKey(serviceName)
 		public_key = db.getServicePublicKey(serviceName)
@@ -100,8 +101,7 @@ def service():
 		accounts = db.getUsersOfService(serviceName)
 		return render_template("service.html", serviceName=serviceName, token=token, sessionId=sessionId, accounts=accounts)
 	except Exception as err:
-		print(f"Error getting service details. {request.args.to_dict()=}\nError: {err}")
-		traceback.print_exc()
+		logger.exception("Error getting service details. request.args = %s\nError: %s", request.args.to_dict(), err, extra={"req_ip", request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 SHUTDOWN_MESSAGE = "__CLOSE__"
@@ -110,18 +110,18 @@ def sessionStreamHandling(sessionId):
 	pubsub = r.pubsub()
 	try:
 		pubsub.subscribe(sessionId)
-		print(f"Subscribed {sessionId}")	# DEBUG
+		logger.debug("Subscribed %s", sessionId)
 		yield f"event: channel-event\ndata: Subscribed {sessionId}\n\n"
 		for message in pubsub.listen():
 			if message["type"] == "message":
 				if message["data"] == SHUTDOWN_MESSAGE:
-					print(f"Shutting down channel: {sessionId}")	# DEBUG
+					logger.debug("Shutting down channel: %s", sessionId)
 					break
 				yield f"data: {message['data']}\n\n"
 	finally:
 		pubsub.unsubscribe(sessionId)
 		r.delete(sessionId)
-		print(f"Session {sessionId} terminated")
+		logger.debug("Session %s terminated.", sessionId)
 
 @app.route("/listenForLogin")
 def listenForLogin():
@@ -135,18 +135,17 @@ def listenForLogin():
 def unsubscribe():
 	try:
 		channel = request.form.get("channel")
-		print(f"Received unsubscribe for {channel}")	# DEBUG
+		logger.debug("Received unsubscribe for %s", channel, extra={"req_ip": request.remote_addr})
 		r.publish(str(channel), SHUTDOWN_MESSAGE)
 	except Exception as err:
-		print(f"/unsubscribe endpoint crapped out, whatever: {err}")	# DEBUG
-		traceback.print_exc()
+		logger.exception("/unsubscribe endpoint crapped out. Whatever.: %s" , err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 	return "OK", 200
 
 @app.route("/registerUser", methods=["POST"])
 def registerUser():
 	try:
-		print(f"{request.form.to_dict()=}")	# DEBUG
+		logger.debug("request.form = %s", request.form.to_dict(), extra={"req_ip": request.remote_addr})
 		sessionId = request.form.get("sessionId")
 		if not sessionId: return "Malformed request. Missing sessionId.", 400
 		if not r.get(str(sessionId)):
@@ -157,7 +156,7 @@ def registerUser():
 		if sessionId != payload["sessionId"]:
 			# making sure sessionId hasn't been swapped by MitM
 			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload['sessionId']}\"", 401
-		print(f"{payload=}")	# DEBUG
+		logger.debug("payload = %s", payload, extra={"req_ip": request.remote_addr})
 		services = getListOfServices()[0]
 		if payload["serviceName"] not in services:
 			return "Service not found", 404
@@ -174,14 +173,13 @@ def registerUser():
 	except InvalidSignature:
 		return "Invalid payload signature", 401
 	except Exception as err:
-		print(f"Registring user failed: {err}")
-		traceback.print_exc()
+		logger.exception("Registring user failed: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/authenticateUser", methods=["POST"])
 def authenticateUser():
 	try:
-		print(f"{request.form.to_dict()=}")	# DEBUG
+		logger.debug("request.form = %s", request.form.to_dict(), extra={"req_ip": request.remote_addr})
 		sessionId = request.form.get("sessionId")
 		if not sessionId: return "Malformed request. Missing sessionId.", 400
 		if not r.get(str(sessionId)):
@@ -192,7 +190,7 @@ def authenticateUser():
 		if sessionId != payload["sessionId"]:
 			# making sure sessionId hasn't been swapped by MitM
 			return f"sessionId \"{sessionId}\" doesn't match the signed one in the payload: \"{payload['sessionId']}\"", 401
-		print(f"{payload=}")	# DEBUG
+		logger.debug("payload = %s", payload, extra={"req_ip": request.remote_addr})
 		services = getListOfServices()[0]
 		if payload["serviceName"] not in services:
 			return "Service not found", 404
@@ -211,21 +209,19 @@ def authenticateUser():
 	except InvalidSignature:
 		return "Invalid payload signature", 401
 	except Exception as err:
-		print(f"Logging user in failed: {err}")
-		traceback.print_exc()
+		logger.exception("Logging user in failed: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/deleteService", methods=["DELETE"])
 def deleteService():
 	try:
 		serviceName = request.args.get("service-name")
-		print("Service name to delete:", serviceName)	# DEBUG
+		logger.debug("Service name to delete: %s", serviceName, extra={"req_ip": request.remote_addr})
 		if not serviceName:
-			print("Bad request for deleting service. request params:", request.args.to_dict())
+			logger.warning("Bad request for deleting service. request params: %s", request.args.to_dict(), extra={"req_ip": request.remote_addr})
 			return "Missing service-name parameter", 400
 	except Exception as err:
-		print("Error deleting service 1:", err)
-		traceback.print_exc()
+		logger.exception("Error deleting service 1: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 	try:
 		listOfServices, status = getListOfServices()
@@ -236,8 +232,7 @@ def deleteService():
 		db.deleteServiceAndItsUsersAccounts(serviceName)
 		return "Service and its users deleted", 200
 	except Exception as err:
-		print("Error deleting service 2:", err)
-		traceback.print_exc()
+		logger.exception("Error deleting service 2: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 @app.route("/deleteAccount", methods=["DELETE"])
@@ -250,8 +245,7 @@ def deleteAccount():
 		db.deleteAccount(account, service)
 		return f"Deleted account \"{account}\" for service \"{service}\".", 204
 	except Exception as err:
-		print(f"Error deleting service: {err}")
-		traceback.print_exc()
+		logger.exception("Error deleting service: %s", err, extra={"req_ip": request.remote_addr})
 		return INTERNAL_SERVER_ERROR, 500
 
 def cleanup():
@@ -260,8 +254,7 @@ def cleanup():
 		r.flushall()
 		print("Database connection closed and cache wiped.")
 	except Exception as err:
-		print(f"Error cleaning up: {err}")
-		traceback.print_exc()
+		print(f"Error cleaning up: {err.with_traceback()}")
 
 if __name__ == "__main__":
 	atexit.register(cleanup)
