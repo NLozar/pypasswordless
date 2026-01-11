@@ -86,7 +86,7 @@ def service():
 		sessionId = str(uuid.uuid4())
 		payload = json.dumps({
 			"serviceName": serviceName,
-			"publicKey": base64.b64encode(public_key).decode("utf-8"),
+			"publicKey": base64.urlsafe_b64encode(public_key).decode("utf-8"),
 			"sessionId": sessionId,
 			"userRegistrationAPIEndpoint": f"https://{HOST}:{FLASK_PORT}/registerUser",
 			"userLoginAPIEndpoint": f"https://{HOST}:{FLASK_PORT}/authenticateUser"
@@ -95,7 +95,7 @@ def service():
 		sig = secret_key.sign(payload.encode())
 		token = json.dumps({
 			"payload": payload,
-			"signature": base64.b64encode(sig).decode("utf-8")
+			"signature": base64.urlsafe_b64encode(sig).decode("utf-8")
 		})
 		accounts = db.getUsersOfService(serviceName)
 		return render_template("service.html", serviceName=serviceName, token=token, sessionId=sessionId, accounts=accounts)
@@ -164,7 +164,7 @@ def registerUser():
 		usersOfService = db.getUsersOfService(payload["serviceName"])
 		if payload["username"] in usersOfService:
 			return f"Username \"{payload['username']}\" taken.", 409
-		db.insertNewUser(payload["username"], payload["serviceName"], base64.b64decode(payload["userPublicKey"].encode("utf-8")))
+		db.insertNewUser(payload["username"], payload["serviceName"], base64.urlsafe_b64decode(payload["userPublicKey"].encode("utf-8")))
 		event = json.dumps({
 			"eventType": "registration",
 			"username": payload["username"]
@@ -200,7 +200,7 @@ def authenticateUser():
 		if payload["username"] not in usersOfService:
 			return f"Username \"{payload['username']}\" not found.", 404
 		userPublicKeyDb = db.getUserPublicKey(payload["username"], payload["serviceName"])
-		if userPublicKeyDb != base64.b64decode(payload["userPublicKey"].encode("utf-8")):
+		if userPublicKeyDb != base64.urlsafe_b64decode(payload["userPublicKey"].encode("utf-8")):
 			return "User public key mismatch.", 401
 		event = json.dumps({
 			"eventType": "login",

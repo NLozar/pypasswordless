@@ -99,7 +99,7 @@ def login():
 		payload = helpers.verifyAndParseToken(str(token_str))
 		serviceName = payload["serviceName"]
 		services = getListOfServices()[0]
-		servicePublicKey = Ed25519PublicKey.from_public_bytes(base64.b64decode(payload["publicKey"].encode("utf-8")))
+		servicePublicKey = Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(payload["publicKey"].encode("utf-8")))
 		if serviceName in services:
 			servicePublicKeyDb = db.getServicePublicKey(serviceName)
 			if servicePublicKey.public_bytes_raw() != servicePublicKeyDb:
@@ -117,14 +117,14 @@ def login():
 		loginPayload = json.dumps({
 			"username": username,
 			"serviceName": serviceName,
-			"userPublicKey": base64.b64encode(userPublicKey).decode("utf-8"),
+			"userPublicKey": base64.urlsafe_b64encode(userPublicKey).decode("utf-8"),
 			"sessionId": payload["sessionId"]
 		})
 		sig = userSecretKey.sign(loginPayload.encode())
 		data = {
 			"payload": loginPayload,
 			"sessionId": payload["sessionId"],
-			"signature": base64.b64encode(sig).decode("utf-8")
+			"signature": base64.urlsafe_b64encode(sig).decode("utf-8")
 		}
 		resp = requests.post(payload["userLoginAPIEndpoint"], data=data, verify=False)
 		return resp.text, resp.status_code
@@ -147,7 +147,7 @@ def register():
 		payload = helpers.verifyAndParseToken(str(token_str))
 		serviceName = payload["serviceName"]
 		services = getListOfServices()[0]
-		servicePublicKey = Ed25519PublicKey.from_public_bytes(base64.b64decode(payload["publicKey"].encode("utf-8")))
+		servicePublicKey = Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(payload["publicKey"].encode("utf-8")))
 		newService = False
 		if serviceName in services:
 			servicePublicKeyDb = db.getServicePublicKey(serviceName)
@@ -162,14 +162,14 @@ def register():
 		registrationPayload = json.dumps({
 			"username": username,
 			"serviceName": serviceName,
-			"userPublicKey": base64.b64encode(userPublicKey).decode("utf-8"),
+			"userPublicKey": base64.urlsafe_b64encode(userPublicKey).decode("utf-8"),
 			"sessionId": payload["sessionId"]
 		})
 		sig = userSecretKey.sign(registrationPayload.encode())
 		data = {
 			"payload": registrationPayload,
 			"sessionId": payload["sessionId"],
-			"signature": base64.b64encode(sig).decode("utf-8")
+			"signature": base64.urlsafe_b64encode(sig).decode("utf-8")
 		}
 		resp = requests.post(payload["userRegistrationAPIEndpoint"], data=data, verify=False)
 		print(f"Response to registration attempt: {resp.status_code}: {resp.text}")	# DEBUG
