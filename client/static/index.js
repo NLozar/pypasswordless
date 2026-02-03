@@ -23,7 +23,7 @@ async function login(accountName) {
 	}
 }
 
-async function register() {
+async function register(service) {
 	console.log("Registration initiated");
 	const token = new URL(window.location.href).searchParams.get("token");
 	const username = document.getElementById("username").value;
@@ -43,6 +43,7 @@ async function register() {
 			})
 		});
 		alert(`${resp.status}: ${await resp.text()}`);
+		location.replace(`service?service-name=${service}`);
 	}
 	catch (err) {
 		console.error(`Account registration failed:\n${err}`);
@@ -69,6 +70,11 @@ async function deleteAccount(account, service) {
 	const url = `/deleteAccount?account=${account}&service=${service}`;
 	try {
 		const resp = await fetch(url, { method: "DELETE" });
+		if (await resp.text() == "__EMPTY__") {
+			alert(`No more accounts for "${service}"`);
+			location.replace("/");
+			return;
+		}
 		if (resp.status >= 400) {
 			alert(`${resp.status}: ${await resp.text()}`);
 			return;

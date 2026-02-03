@@ -49,7 +49,7 @@ def service():
 			return "Missing service name", 400
 		accounts = db.getAccountsUsernamesForService(serviceName)
 		if not accounts:
-			return f"No accounts found for service \"{serviceName}\""
+			return f"No accounts found for service \"{serviceName}\"", 404
 		return render_template("serviceAccounts.html", accounts=accounts, serviceName=serviceName)
 	except Exception as err:
 		logger.exception("Error getting service accounts: %s", err, extra={"req_ip": request.remote_addr})
@@ -197,6 +197,7 @@ def deleteAccount():
 		db.deleteAccount(account, service)
 		if not db.getAccountsUsernamesForService(service):
 			db.deleteService(service)
+			return "__EMPTY__", 200
 		return f"Deleted account \"{account}\" for service \"{service}\".", 204
 	except Exception as err:
 		logger.exception("Error deleting service: %s", err, extra={"req_ip": request.remote_addr})
